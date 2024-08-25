@@ -26,6 +26,9 @@ def generate_compose(output_file, clients):
                     'PYTHONUNBUFFERED=1',
                     'LOGGING_LEVEL=DEBUG'
                 ],
+                'volumes': [
+                    './server/config.ini:/config.ini'
+                ],
             }
         },
         'networks': {
@@ -49,7 +52,10 @@ def generate_compose(output_file, clients):
                 'LOGGING_LEVEL=DEBUG'
             ],
             'networks': ['testing_net'],
-            'depends_on': ['server']
+            'depends_on': ['server'],
+            'volumes': [
+                './client/config.yaml:/config.yaml'
+            ],
         }
 
     with open(output_file, 'w') as file:
