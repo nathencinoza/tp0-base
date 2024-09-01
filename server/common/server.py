@@ -27,9 +27,7 @@ class Server:
         while self._is_active:
             try:
                 client_sock = self.__accept_new_connection()
-                if client_sock:
-                    self._clients.append(client_sock)
-                    self.__handle_client_connection(client_sock)
+                self.__handle_client_connection(client_sock)
             except OSError as e:
                 if not self._is_active:
                     break
@@ -62,6 +60,7 @@ class Server:
         logging.info(f"action: shutdown | result: received signal {signum}")
         self._is_active = False
         for client in self._clients:
+            logging.info(f"action: shutdown | result: closing client connection {client}")
             client.close()
         self._clients.clear()
         if self._server_socket:
@@ -81,4 +80,7 @@ class Server:
         logging.info('action: accept_connections | result: in_progress')
         c, addr = self._server_socket.accept()
         logging.info(f'action: accept_connections | result: success | ip: {addr[0]}')
+        self._clients.append(c)
+        logging.info("clients list length: {}".format(len(self._clients)))
+
         return c
