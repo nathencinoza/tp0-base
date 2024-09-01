@@ -5,6 +5,9 @@ import (
 	"os"
 	"strings"
 	"time"
+	"os/signal" 
+	"syscall"  
+
 
 	"github.com/op/go-logging"
 	"github.com/pkg/errors"
@@ -99,7 +102,7 @@ func main() {
 	if err := InitLogger(v.GetString("log.level")); err != nil {
 		log.Criticalf("%s", err)
 	}
-
+	
 	// Print program config with debugging purposes
 	PrintConfig(v)
 
@@ -110,6 +113,23 @@ func main() {
 		LoopPeriod:    v.GetDuration("loop.period"),
 	}
 
-	client := common.NewClient(clientConfig)
-	client.StartClientLoop()
+    client := common.NewClient(clientConfig)
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
+
+	done := make(chan bool, 1)
+
+	go func() {
+		client.StartClientLoop()
+		done <- true
+	}()
+
+	select {
+	case <-sigChan:
+		log.Info("action: shutdown | result: received SIGTERM")
+		client.Stop()
+	case <-done:
+		log.Info("action: client | result: completed normally")
+	}
 }

@@ -1,6 +1,6 @@
 import socket
 import logging
-
+import signal
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -8,6 +8,8 @@ class Server:
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.bind(('', port))
         self._server_socket.listen(listen_backlog)
+        self._clients = []
+        self._is_active = True
 
     def run(self):
         """
@@ -20,10 +22,21 @@ class Server:
 
         # TODO: Modify this program to handle signal to graceful shutdown
         # the server
-        while True:
-            client_sock = self.__accept_new_connection()
-            self.__handle_client_connection(client_sock)
+        signal.signal(signal.SIGTERM, self.__handle_sigterm)
 
+        while self._is_active:
+            try:
+                client_sock = self.__accept_new_connection()
+                if client_sock:
+                    self._clients.append(client_sock)
+                    self.__handle_client_connection(client_sock)
+            except OSError as e:
+                if not self._is_active:
+                    break
+                logging.error(f"action: server | result: fail | error: {e}")
+                break
+
+            
     def __handle_client_connection(self, client_sock):
         """
         Read message from a specific client socket and closes the socket
@@ -42,6 +55,19 @@ class Server:
             logging.error("action: receive_message | result: fail | error: {e}")
         finally:
             client_sock.close()
+            if client_sock in self._clients:
+                self._clients.remove(client_sock)
+    
+    def __handle_sigterm(self, signum, frame):
+        logging.info(f"action: shutdown | result: received signal {signum}")
+        self._is_active = False
+        for client in self._clients:
+            client.close()
+        self._clients.clear()
+        if self._server_socket:
+            self._server_socket.close()
+        logging.info("action: server_close | result: success")
+
 
     def __accept_new_connection(self):
         """
