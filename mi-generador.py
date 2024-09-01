@@ -49,7 +49,8 @@ def generate_compose(output_file, clients):
             'entrypoint': '/client',
             'environment': [
                 'PYTHONUNBUFFERED=1',
-                'LOGGING_LEVEL=DEBUG'
+                'LOGGING_LEVEL=DEBUG',
+                'CLI_ID={}'.format(i),
             ],
             'networks': ['testing_net'],
             'depends_on': ['server'],
