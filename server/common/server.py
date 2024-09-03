@@ -46,8 +46,8 @@ class Server:
         """
         try:
             protocol = Protocol(client_sock)
-            name, surname, document, birthdate, number = protocol.receive_bet()
-            self.__handle_bet(name, surname, document, birthdate, number, protocol)
+            size, bets  = protocol.receive_bets()
+            self.__handle_bets(bets, size, protocol)
         except OSError as e:
             logging.error("action: receive_message | result: fail | error: {e}")
         finally:
@@ -55,11 +55,15 @@ class Server:
             if client_sock in self._clients:
                 self._clients.remove(client_sock)
 
-    def __handle_bet(self, name, surname, document, birthdate, number, protocol):
-        bet = Bet('1', name, surname, document, birthdate, number)
-        store_bets([bet])
+    def __handle_bets(self, bets, size, protocol):
+        for bet in bets:
+            store_bets(bet)
+        if len(bets) != size:
+            logging.error(f"action: apuesta_recibida | result: fail | cantidad: {size}")
+            protocol.send_error()
+            return
+        logging.info(f"action: apuesta_recibida | result: success | cantidad: {size}")
         protocol.send_success()
-        logging.info(f"action: apuesta_almacenada | result: success | dni: {document} | numero: {number}")
     
     def __handle_sigterm(self, signum, frame):
         logging.info(f"action: shutdown | result: received signal {signum}")

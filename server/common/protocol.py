@@ -1,3 +1,5 @@
+from common.utils import Bet
+
 BET_MESSAGE = 1
 SUCCESS_CODE = 2
 ERROR_CODE = 3
@@ -20,25 +22,37 @@ class Protocol:
             data += packet
         return data
 
-    def receive_bet(self):
-        code = int.from_bytes(self.receive_exact(SIZE), byteorder='big')
-        if code != BET_MESSAGE:
-            raise Exception("Invalid code")
-        
-        name_size = int.from_bytes(self.receive_exact(SIZE), byteorder='big')
-        name = self.receive_exact(name_size).decode()
-        
-        surname_size = int.from_bytes(self.receive_exact(SIZE), byteorder='big')
-        surname = self.receive_exact(surname_size).decode()
-        
-        document = int.from_bytes(self.receive_exact(SIZE), byteorder='big')
-        birthdate = self.receive_exact(DATE_SIZE).decode()
-        number = int.from_bytes(self.receive_exact(SIZE), byteorder='big')
-        
-        return name, surname, document, birthdate, number
+    def receive_bets(self):
+        bets = []
+        bets_size = int.from_bytes(self.receive_exact(SIZE), byteorder='big')
+        for _ in range(bets_size):
+            code = int.from_bytes(self.receive_exact(SIZE), byteorder='big')
+            if code != BET_MESSAGE:
+                raise Exception("Invalid code")
+
+            agency_name_size = int.from_bytes(self.receive_exact(SIZE), byteorder='big')
+            agency = self.receive_exact(agency_name_size).decode()
+            
+            name_size = int.from_bytes(self.receive_exact(SIZE), byteorder='big')
+            name = self.receive_exact(name_size).decode()
+            
+            surname_size = int.from_bytes(self.receive_exact(SIZE), byteorder='big')
+            surname = self.receive_exact(surname_size).decode()
+            
+            document = int.from_bytes(self.receive_exact(SIZE), byteorder='big')
+            birthdate = self.receive_exact(DATE_SIZE).decode()
+            number = int.from_bytes(self.receive_exact(SIZE), byteorder='big')
+            
+            bet = Bet(agency, name, surname, document, birthdate, number)
+            bets.append(bet)
+        return bets
+    
 
     def send_success(self):
         self.socket.sendall(SUCCESS_CODE.to_bytes(SIZE, byteorder='big'))
+
+    def send_error(self):
+        self.socket.sendall(ERROR_CODE.to_bytes(SIZE, byteorder='big'))
 
 
         

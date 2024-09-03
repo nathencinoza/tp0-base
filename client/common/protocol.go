@@ -7,6 +7,7 @@ import (
 )
 
 type Bet struct {
+	Agency	   string
 	Name       string
 	Surname    string
 	Document   int
@@ -41,61 +42,79 @@ func ntohl(value []byte) uint32 {
 }
 
 // SerializeBet serializes a Bet structure into a byte slice and sends it
-func (p *Protocol) sendBet(bet Bet) (string, error) {
-
-	// Serialize the bet type
-	betBytes := htonl(int(BET))
-	_, err := p.conn.Write(betBytes)
+func (p *Protocol) sendBets(bets []Bet) (string, error) {
+	betsAmount := htonl(len(bets))
+	_, err := p.conn.Write(betsAmount)
 	if err != nil {
-		return "Failed to send bet type", err
+		return "Failed to send bets amount", err
 	}
 
-	// Serialize the name
-	nameBytes := []byte(bet.Name)
-	nameSizeBytes := htonl(len(nameBytes))
-	_, err = p.conn.Write(nameSizeBytes)
-	if err != nil {
-		return "Failed to send name size", err
-	}
-	_, err = p.conn.Write(nameBytes)
-	if err != nil {
-		return "Failed to send name", err
-	}
+	for _, bet := range bets {
+		// Serialize the bet type
+		betBytes := htonl(int(BET))
+		_, err := p.conn.Write(betBytes)
+		if err != nil {
+			return "Failed to send bet type", err
+		}
 
-	// Serialize the surname
-	surnameBytes := []byte(bet.Surname)
-	surnameSizeBytes := htonl(len(surnameBytes))
-	_, err = p.conn.Write(surnameSizeBytes)
-	if err != nil {
-		return "Failed to send surname size", err
-	}
-	_, err = p.conn.Write(surnameBytes)
-	if err != nil {
-		return "Failed to send surname", err
-	}
+		// Serialize the agency	
+		agencyBytes := []byte(bet.Agency)
+		agencySizeBytes := htonl(len(agencyBytes))
+		_, err = p.conn.Write(agencySizeBytes)
+		if err != nil {
+			return "Failed to send agency size", err
+		}
+		_, err = p.conn.Write(agencyBytes)
+		if err != nil {
+			return "Failed to send agency", err
+		}
 
-	// Serialize the document
-	documentBytes := htonl(int(bet.Document))
-	_, err = p.conn.Write(documentBytes)
-	if err != nil {
-		return "Failed to send document", err
-	}
+		// Serialize the name
+		nameBytes := []byte(bet.Name)
+		nameSizeBytes := htonl(len(nameBytes))
+		_, err = p.conn.Write(nameSizeBytes)
+		if err != nil {
+			return "Failed to send name size", err
+		}
+		_, err = p.conn.Write(nameBytes)
+		if err != nil {
+			return "Failed to send name", err
+		}
 
-	// Serialize the birthdate
-	birthdateBytes := []byte(bet.Birthdate)
-	_, err = p.conn.Write(birthdateBytes)
-	if err != nil {
-		return "Failed to send birthdate", err
-	}
+		// Serialize the surname
+		surnameBytes := []byte(bet.Surname)
+		surnameSizeBytes := htonl(len(surnameBytes))
+		_, err = p.conn.Write(surnameSizeBytes)
+		if err != nil {
+			return "Failed to send surname size", err
+		}
+		_, err = p.conn.Write(surnameBytes)
+		if err != nil {
+			return "Failed to send surname", err
+		}
 
-	// Serialize the number
-	numberBytes := htonl(int(bet.Number))
-	_, err = p.conn.Write(numberBytes)
-	if err != nil {
-		return "Failed to send number", err
-	}
+		// Serialize the document
+		documentBytes := htonl(int(bet.Document))
+		_, err = p.conn.Write(documentBytes)
+		if err != nil {
+			return "Failed to send document", err
+		}
 
-	return "Bet sent", nil
+		// Serialize the birthdate
+		birthdateBytes := []byte(bet.Birthdate)
+		_, err = p.conn.Write(birthdateBytes)
+		if err != nil {
+			return "Failed to send birthdate", err
+		}
+
+		// Serialize the number
+		numberBytes := htonl(int(bet.Number))
+		_, err = p.conn.Write(numberBytes)
+		if err != nil {
+			return "Failed to send number", err
+		}
+	}
+	return "success", nil
 }
 
 func (p *Protocol) receiveMessage() (int, error) {
@@ -107,6 +126,3 @@ func (p *Protocol) receiveMessage() (int, error) {
 	messageType := int(ntohl(messageBytes))
 	return messageType, nil
 }
-
-
-	

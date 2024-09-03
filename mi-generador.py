@@ -40,7 +40,6 @@ def generate_compose(output_file, clients):
             }
         }
     }
-
     for i in range(1, clients + 1):
         client_name = f'client{i}'
         compose['services'][client_name] = {
@@ -51,11 +50,7 @@ def generate_compose(output_file, clients):
                 'PYTHONUNBUFFERED=1',
                 'LOGGING_LEVEL=DEBUG',
                 'CLI_ID={}'.format(i),
-                'NOMBRE=NATHALIA', 
-                'APELLIDO=ENCINOZA',
-                'DOCUMENTO=12345678',
-                'NACIMIENTO=2000-01-01',
-                'NUMERO=123',
+                'FILE_PATH=/agency-1.csv'.format(i),
             ],
             'networks': ['testing_net'],
             'depends_on': ['server'],

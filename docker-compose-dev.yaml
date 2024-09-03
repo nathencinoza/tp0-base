@@ -15,11 +15,22 @@ services:
     - PYTHONUNBUFFERED=1
     - LOGGING_LEVEL=DEBUG
     - CLI_ID=1
-    - NOMBRE=NATHALIA
-    - APELLIDO=ENCINOZA
-    - DOCUMENTO=12345678
-    - NACIMIENTO=2000-01-01
-    - NUMERO=123
+    - FILE_PATH=/agency-1.csv
+    image: client:latest
+    networks:
+    - testing_net
+    volumes:
+    - ./client/config.yaml:/config.yaml
+  client2:
+    container_name: client2
+    depends_on:
+    - server
+    entrypoint: /client
+    environment:
+    - PYTHONUNBUFFERED=1
+    - LOGGING_LEVEL=DEBUG
+    - CLI_ID=2
+    - FILE_PATH=/agency-1.csv
     image: client:latest
     networks:
     - testing_net
