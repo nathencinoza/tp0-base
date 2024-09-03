@@ -57,72 +57,77 @@ func (c *Client) createClientSocket() error {
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
 	
-	document, err := strconv.Atoi(os.Getenv("DOCUMENTO"))
-	if err != nil {
-		log.Errorf("action: convert_document | result: fail | client_id: %v | error: %v",
-			c.config.ID,
-			err,
-		)
-		return
+	for msgID := 1; msgID <= c.config.LoopAmount; msgID++ {	
+		document, err := strconv.Atoi(os.Getenv("DOCUMENTO"))
+		if err != nil {
+			log.Errorf("action: convert_document | result: fail | client_id: %v | error: %v",
+				c.config.ID,
+				err,
+			)
+			return
+		}
+
+		number, err := strconv.Atoi(os.Getenv("NUMERO"))
+		if err != nil {
+			log.Errorf("action: convert_number | result: fail | client_id: %v | error: %v",
+				c.config.ID,
+				err,
+			)
+			return
+		}
+
+		name := os.Getenv("NOMBRE")
+		surname := os.Getenv("APELLIDO")
+		birthdate := os.Getenv("NACIMIENTO")
+
+		bet := Bet{
+			Name:      name,
+			Surname:   surname,
+			Document:  document,
+			Birthdate: birthdate,
+			Number:    number,
+		}
+
+		c.createClientSocket()
+
+		protocol := NewProtocol(c.conn)
+
+		_, err = protocol.sendBet(bet)
+
+		if err != nil {
+			log.Errorf("action: send_bet | result: fail | client_id: %v | error: %v",
+				c.config.ID,
+				err,
+			)
+			return
+		}
+
+		response, err := protocol.receiveMessage()
+		if err != nil {
+			log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
+				c.config.ID,
+				err,
+			)
+			return
+		}
+
+		if response == OK {
+			log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v",
+				document,
+				number,
+			)
+		} else {
+			log.Errorf("action: receive_message | result: fail | client_id: %v | response: %v",
+				c.config.ID,
+				response,
+			)
+		}
+		c.conn.Close()
+		time.Sleep(c.config.LoopPeriod)
+
 	}
+	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
 
-	number, err := strconv.Atoi(os.Getenv("NUMERO"))
-	if err != nil {
-		log.Errorf("action: convert_number | result: fail | client_id: %v | error: %v",
-			c.config.ID,
-			err,
-		)
-		return
-	}
-
-	name := os.Getenv("NOMBRE")
-	surname := os.Getenv("APELLIDO")
-	birthdate := os.Getenv("NACIMIENTO")
-
-	bet := Bet{
-		Name:      name,
-		Surname:   surname,
-		Document:  document,
-		Birthdate: birthdate,
-		Number:    number,
-	}
-
-	c.createClientSocket()
-
-	protocol := NewProtocol(c.conn)
-
-	_, err = protocol.sendBet(bet)
-
-	if err != nil {
-		log.Errorf("action: send_bet | result: fail | client_id: %v | error: %v",
-			c.config.ID,
-			err,
-		)
-		return
-	}
-
-	response, err := protocol.receiveMessage()
-	if err != nil {
-		log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
-			c.config.ID,
-			err,
-		)
-		return
-	}
-
-	if response == OK {
-		log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v",
-			document,
-			number,
-		)
-	} else {
-		log.Errorf("action: receive_message | result: fail | client_id: %v | response: %v",
-			c.config.ID,
-			response,
-		)
-	}
-
-	c.conn.Close()
 }
 
 

@@ -132,6 +132,4 @@ func main() {
 	case <-done:
 		log.Info("action: client | result: completed normally")
 	}
-	os.Exit(0)  // Ensure exit code 0 on successful completion
-
 }
