@@ -24,7 +24,6 @@ def generate_compose(output_file, clients):
                 'entrypoint': 'python3 /main.py',
                 'environment': [
                     'PYTHONUNBUFFERED=1',
-                    'CLI_LOG_LEVEL=DEBUG'
                 ],
                 'volumes': [
                     './server/config.ini:/config.ini'
@@ -49,7 +48,6 @@ def generate_compose(output_file, clients):
             'entrypoint': '/client',
             'environment': [
                 'PYTHONUNBUFFERED=1',
-                'CLI_LOG_LEVEL=DEBUG',
                 'CLI_ID={}'.format(i),
             ],
             'networks': ['testing_net'],
