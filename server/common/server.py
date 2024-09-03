@@ -81,6 +81,5 @@ class Server:
         c, addr = self._server_socket.accept()
         logging.info(f'action: accept_connections | result: success | ip: {addr[0]}')
         self._clients.append(c)
-        logging.info("clients list length: {}".format(len(self._clients)))
 
         return c
