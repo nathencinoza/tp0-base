@@ -1,11 +1,11 @@
 package common
 
 import (
-	"bufio"
-	"fmt"
 	"net"
-	"sync"
+	"sync" // ver si tengo que usarlo
 	"time"
+	"strconv"
+	"os"
 
 	"github.com/op/go-logging"
 )
@@ -56,47 +56,80 @@ func (c *Client) createClientSocket() error {
 
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
-	// There is an autoincremental msgID to identify every message sent
-	// Messages if the message amount threshold has not been surpassed
-	for msgID := 1; msgID <= c.config.LoopAmount; msgID++ {
-		// Create the connection the server in every loop iteration. Send an
-		c.createClientSocket()
-
-		// TODO: Modify the send to avoid short-write
-		fmt.Fprintf(
-			c.conn,
-			"[CLIENT %v] Message N°%v\n",
+	
+	document, err := strconv.Atoi(os.Getenv("DOCUMENTO"))
+	if err != nil {
+		log.Errorf("action: convert_document | result: fail | client_id: %v | error: %v",
 			c.config.ID,
-			msgID,
+			err,
 		)
-		msg, err := bufio.NewReader(c.conn).ReadString('\n')
-		c.conn.Close()
-
-		if err != nil {
-			log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
-				c.config.ID,
-				err,
-			)
-			return
-		}
-
-		log.Infof("action: receive_message | result: success | client_id: %v | msg: %v",
-			c.config.ID,
-			msg,
-		)
-
-		// Wait a time between sending one message and the next one
-		time.Sleep(c.config.LoopPeriod)
-
+		return
 	}
-	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
+
+	number, err := strconv.Atoi(os.Getenv("NUMERO"))
+	if err != nil {
+		log.Errorf("action: convert_number | result: fail | client_id: %v | error: %v",
+			c.config.ID,
+			err,
+		)
+		return
+	}
+
+	name := os.Getenv("NOMBRE")
+	surname := os.Getenv("APELLIDO")
+	birthdate := os.Getenv("NACIMIENTO")
+
+	bet := Bet{
+		Name:      name,
+		Surname:   surname,
+		Document:  document,
+		Birthdate: birthdate,
+		Number:    number,
+	}
+
+	c.createClientSocket()
+
+	protocol := NewProtocol(c.conn)
+
+	_, err = protocol.sendBet(bet)
+
+	if err != nil {
+		log.Errorf("action: send_bet | result: fail | client_id: %v | error: %v",
+			c.config.ID,
+			err,
+		)
+		return
+	}
+
+	response, err := protocol.receiveMessage()
+	if err != nil {
+		log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
+			c.config.ID,
+			err,
+		)
+		return
+	}
+
+	if response == OK {
+		log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v",
+			document,
+			number,
+		)
+	} else {
+		log.Errorf("action: receive_message | result: fail | client_id: %v | response: %v",
+			c.config.ID,
+			response,
+		)
+	}
+
+	c.conn.Close()
 }
+
 
 
 // Stop Gracefully stops the client by closing the stop channel and waiting for
 // the loop to finish its current iteration.
 func (c *Client) Stop() {
-	log.Infof("action: stop_client | result: start | client_id: %v", c.config.ID)
 	close(c.stopCh)
 	c.wg.Wait()
 

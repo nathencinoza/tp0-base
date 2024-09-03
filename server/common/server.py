@@ -1,6 +1,8 @@
 import socket
 import logging
 import signal
+from common.protocol import Protocol
+from common.utils import Bet, store_bets
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -43,18 +45,21 @@ class Server:
         client socket will also be closed
         """
         try:
-            # TODO: Modify the receive to avoid short-reads
-            msg = client_sock.recv(1024).rstrip().decode('utf-8')
-            addr = client_sock.getpeername()
-            logging.info(f'action: receive_message | result: success | ip: {addr[0]} | msg: {msg}')
-            # TODO: Modify the send to avoid short-writes
-            client_sock.send("{}\n".format(msg).encode('utf-8'))
+            protocol = Protocol(client_sock)
+            name, surname, document, birthdate, number = protocol.receive_bet()
+            self.__handle_bet(name, surname, document, birthdate, number, protocol)
         except OSError as e:
             logging.error("action: receive_message | result: fail | error: {e}")
         finally:
             client_sock.close()
             if client_sock in self._clients:
                 self._clients.remove(client_sock)
+
+    def __handle_bet(self, name, surname, document, birthdate, number, protocol):
+        bet = Bet('1', name, surname, document, birthdate, number)
+        store_bets([bet])
+        protocol.send_success()
+        logging.info(f"action: apuesta_almacenada | result: success | dni: {document} | numero: {number}")
     
     def __handle_sigterm(self, signum, frame):
         logging.info(f"action: shutdown | result: received signal {signum}")
@@ -81,6 +86,5 @@ class Server:
         c, addr = self._server_socket.accept()
         logging.info(f'action: accept_connections | result: success | ip: {addr[0]}')
         self._clients.append(c)
-        logging.info("clients list length: {}".format(len(self._clients)))
 
         return c
