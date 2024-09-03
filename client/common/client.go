@@ -96,7 +96,6 @@ func (c *Client) StartClientLoop() {
 // Stop Gracefully stops the client by closing the stop channel and waiting for
 // the loop to finish its current iteration.
 func (c *Client) Stop() {
-	log.Infof("action: stop_client | result: start | client_id: %v", c.config.ID)
 	close(c.stopCh)
 	c.wg.Wait()
 

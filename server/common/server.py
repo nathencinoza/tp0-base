@@ -57,7 +57,6 @@ class Server:
                 self._clients.remove(client_sock)
     
     def __handle_sigterm(self, signum, frame):
-        logging.info(f"action: shutdown | result: received signal {signum}")
         self._is_active = False
         for client in self._clients:
             logging.info(f"action: shutdown | result: closing client connection {client}")
