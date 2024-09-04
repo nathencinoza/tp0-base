@@ -2,16 +2,21 @@ import socket
 import logging
 import signal
 from common.protocol import Protocol
-from common.utils import Bet, store_bets
-
+from common.utils import Bet, store_bets, load_bets, has_won
+BET_MESSAGE = 1
+FINISH_MESSAGE = 4
 class Server:
-    def __init__(self, port, listen_backlog):
+    def __init__(self, port, listen_backlog, ammount_clients):
+        """
         # Initialize server socket
+        """
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.bind(('', port))
         self._server_socket.listen(listen_backlog)
         self._clients = []
-        self._is_active = True
+        self._is_active = True  
+        self.ammount_clients_done = 0
+        self.total_clients = ammount_clients
 
     def run(self):
         """
@@ -46,14 +51,38 @@ class Server:
         """
         try:
             protocol = Protocol(client_sock)
-            size, bets  = protocol.receive_bets()
-            self.__handle_bets(bets, size, protocol)
+            code = protocol.receive_code()
+            if code == BET_MESSAGE:
+                size, bets  = protocol.receive_bets()
+                self.__handle_bets(bets, size, protocol)
+            elif code == FINISH_MESSAGE:
+                self.ammount_clients_done += 1
+                if self.ammount_clients_done == self.total_clients:
+                    self.__handle_draw() 
         except OSError as e:
-            logging.error("action: receive_message | result: fail | error: {e}")
+            logging.error("action: receive_message | result: fail | error: {e}", e) 
         finally:
-            client_sock.close()
-            if client_sock in self._clients:
-                self._clients.remove(client_sock)
+            if (code != FINISH_MESSAGE):
+                client_sock.close()
+                for client in self._clients:
+                    if client == client_sock:
+                        self._clients.remove(client)
+
+
+    def __handle_draw(self):
+        try: 
+            logging.info("action: sorteo | result: success")
+            bets = load_bets()
+            winners = [bet for bet in bets if has_won(bet)]
+            for client in self._clients:
+                protocol = Protocol(client)
+                protocol.send_winners(winners)
+        finally: 
+            for client in self._clients:
+                client.close()
+            self._clients.clear()
+
+
 
     def __handle_bets(self, bets, size, protocol):
         store_bets(bets)

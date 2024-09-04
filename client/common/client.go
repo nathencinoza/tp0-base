@@ -89,7 +89,6 @@ func (c *Client) StartClientLoop() {
 
 		batchSize := 0
 		batchBets := make([]Bet, 0, c.config.MaxBatch)
-
 		for _, record := range records {
 			if len(record) != 5 {
 				log.Errorf("action: parse_record | result: skip | client_id: %v | record: %v",
@@ -143,7 +142,6 @@ func (c *Client) StartClientLoop() {
 			batchSize++
 
 			if batchSize == c.config.MaxBatch {
-				log.Infof("MANDO UNA TANDA DE APUESTAS %v %v", c.config.MaxBatch, len(records))
 				c.createClientSocket()
 				protocol := NewProtocol(c.conn)
 
@@ -176,11 +174,32 @@ func (c *Client) StartClientLoop() {
 				c.config.ID,
 				c.config.MaxBatch,
 			)
-		}
+			}	
 		c.conn.Close()
-
+		}
 	}
-	}
+	
+			c.createClientSocket()
+			protocol := NewProtocol(c.conn)
+			_, err = protocol.sendFinish()
+			if err != nil {
+				log.Errorf("action: send_finish | result: fail | client_id: %v | error: %v",
+					c.config.ID,
+					err,
+				)
+				return
+			} 
+			response, err := protocol.receiveWinners()
+			if err != nil {
+				log.Errorf("action: receive_winners | result: fail | client_id: %v | error: %v",
+					c.config.ID,
+					err,
+				)
+				return
+			}
+			log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v",
+				response,
+			)
 	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
 		
 }

@@ -1,5 +1,5 @@
 from common.utils import Bet
-
+import logging  
 BET_MESSAGE = 1
 SUCCESS_CODE = 2
 ERROR_CODE = 3
@@ -21,14 +21,14 @@ class Protocol:
                 raise Exception("Connection closed unexpectedly")
             data += packet
         return data
+    
+    def receive_code(self):
+        return int.from_bytes(self.receive_exact(SIZE), byteorder='big')
 
     def receive_bets(self):
         bets = []
         bets_size = int.from_bytes(self.receive_exact(SIZE), byteorder='big')
         for _ in range(bets_size):
-            code = int.from_bytes(self.receive_exact(SIZE), byteorder='big')
-            if code != BET_MESSAGE:
-                raise Exception("Invalid code")
 
             agency = int.from_bytes(self.receive_exact(SIZE), byteorder='big')
             
@@ -53,5 +53,9 @@ class Protocol:
     def send_error(self):
         self.socket.sendall(ERROR_CODE.to_bytes(SIZE, byteorder='big'))
 
-
-        
+    def send_winners(self, winners): 
+        self.socket.sendall(len(winners).to_bytes(SIZE, byteorder='big'))
+        for winner in winners:
+            document_size = len(winner.document)
+            self.socket.sendall(document_size.to_bytes(SIZE, byteorder='big'))
+            self.socket.sendall(winner.document.encode())

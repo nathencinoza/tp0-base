@@ -19,6 +19,7 @@ const (
     BET int = 1
     OK  int = 2
 	ERROR int = 3
+	FINISH int = 4
 )
 type Protocol struct {
 	conn net.Conn
@@ -43,19 +44,19 @@ func ntohl(value []byte) uint32 {
 
 // SerializeBet serializes a Bet structure into a byte slice and sends it
 func (p *Protocol) sendBets(bets []Bet) (string, error) {
+	betBytes := htonl(int(BET))
+	_, err := p.conn.Write(betBytes)
+	if err != nil {
+		return "Failed to send bet type", err
+	}
 	betsAmount := htonl(len(bets))
-	_, err := p.conn.Write(betsAmount)
+	_, err = p.conn.Write(betsAmount)
 	if err != nil {
 		return "Failed to send bets amount", err
 	}
 
 	for _, bet := range bets {
 		// Serialize the bet type
-		betBytes := htonl(int(BET))
-		_, err := p.conn.Write(betBytes)
-		if err != nil {
-			return "Failed to send bet type", err
-		}
 
 		// Serialize the agency	
 		agencyBytes := htonl(bet.Agency)
@@ -120,4 +121,40 @@ func (p *Protocol) receiveMessage() (int, error) {
 	}
 	messageType := int(ntohl(messageBytes))
 	return messageType, nil
+}
+
+
+func (p *Protocol) sendFinish() (string, error) {
+	finishBytes := htonl(int(FINISH))
+	_, err := p.conn.Write(finishBytes)
+	if err != nil {
+		return "Failed to send finish", err
+	}
+	return "success", nil
+}
+
+
+func (p *Protocol) receiveWinners() (int, error) {
+    amountOfWinnersBytes := make([]byte, 4)
+    _, err := p.conn.Read(amountOfWinnersBytes)
+    if err != nil {
+        return 0, err
+    }
+    amountOfWinners := int(ntohl(amountOfWinnersBytes))
+
+	for i := 0; i < amountOfWinners; i++ {
+		numberBytes := make([]byte, 4)
+		_, err := p.conn.Read(numberBytes)
+		if err != nil {
+			return 0, err
+		}
+
+		prizeBytes := make([]byte, 4)
+		_, err = p.conn.Read(prizeBytes)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	return amountOfWinners, nil
 }
