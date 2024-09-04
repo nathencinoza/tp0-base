@@ -24,8 +24,6 @@ type ClientConfig struct {
 type Client struct {
 	config ClientConfig
 	conn   net.Conn
-	stopCh chan struct{}  
-	wg     sync.WaitGroup
 }
 
 // NewClient Initializes a new client receiving the configuration
@@ -96,12 +94,8 @@ func (c *Client) StartClientLoop() {
 // Stop Gracefully stops the client by closing the stop channel and waiting for
 // the loop to finish its current iteration.
 func (c *Client) Stop() {
-	close(c.stopCh)
-	c.wg.Wait()
-
 	if c.conn != nil {
 		c.conn.Close()
-		log.Infof("action: close_connection | result: success | client_id: %v", c.config.ID)
 	}
 	log.Infof("action: stop_client | result: success | client_id: %v", c.config.ID)
 }
