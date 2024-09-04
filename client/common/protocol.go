@@ -7,7 +7,7 @@ import (
 )
 
 type Bet struct {
-	Agency	   string
+	Agency	   int
 	Name       string
 	Surname    string
 	Document   int
@@ -58,12 +58,7 @@ func (p *Protocol) sendBets(bets []Bet) (string, error) {
 		}
 
 		// Serialize the agency	
-		agencyBytes := []byte(bet.Agency)
-		agencySizeBytes := htonl(len(agencyBytes))
-		_, err = p.conn.Write(agencySizeBytes)
-		if err != nil {
-			return "Failed to send agency size", err
-		}
+		agencyBytes := htonl(bet.Agency)
 		_, err = p.conn.Write(agencyBytes)
 		if err != nil {
 			return "Failed to send agency", err

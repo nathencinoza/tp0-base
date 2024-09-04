@@ -30,7 +30,7 @@ services:
     - PYTHONUNBUFFERED=1
     - LOGGING_LEVEL=DEBUG
     - CLI_ID=2
-    - FILE_PATH=/agency-1.csv
+    - FILE_PATH=/agency-2.csv
     image: client:latest
     networks:
     - testing_net

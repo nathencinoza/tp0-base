@@ -50,7 +50,7 @@ def generate_compose(output_file, clients):
                 'PYTHONUNBUFFERED=1',
                 'LOGGING_LEVEL=DEBUG',
                 'CLI_ID={}'.format(i),
-                'FILE_PATH=/agency-1.csv'.format(i),
+                'FILE_PATH=/agency-{}.csv'.format(i),
             ],
             'networks': ['testing_net'],
             'depends_on': ['server'],

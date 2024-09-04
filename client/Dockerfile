@@ -17,4 +17,6 @@ RUN CGO_ENABLED=0 GOOS=linux go build -mod vendor -o bin/client github.com/7574-
 FROM busybox:latest
 COPY --from=builder /build/bin/client /client
 COPY ./client/common/agency-1.csv /agency-1.csv
+COPY ./client/common/agency-2.csv /agency-2.csv
+
 ENTRYPOINT ["/bin/sh"]

@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"os"
 	"encoding/csv"
+    "path/filepath"
+    "strings"
 
 	"github.com/op/go-logging"
 )
@@ -58,11 +60,8 @@ func (c *Client) createClientSocket() error {
 
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
-	c.createClientSocket()
-	protocol := NewProtocol(c.conn)
-	log.Infof("protocolo creado", protocol)
 
-	for msgID := 1; msgID <= c.config.LoopAmount; msgID++ {	
+	
 		file_path := os.Getenv("FILE_PATH")
 		log.Infof("action: open_file | result: success | client_id: %v | file_path: %v",
 			c.config.ID,
@@ -118,7 +117,22 @@ func (c *Client) StartClientLoop() {
 				return
 			}
 
+			fileName := filepath.Base(file_path)
+			agencyStr := strings.TrimPrefix(fileName, "agency-")
+			agencyStr = strings.TrimSuffix(agencyStr, ".csv")
+			
+			agency, err := strconv.Atoi(agencyStr)
+			if err != nil {
+				log.Errorf("action: parse_agency | result: skip | client_id: %v | error: %v",
+					c.config.ID,
+					err,
+				)
+				return
+			}
+					
+		
 			bet := Bet{
+				Agency:    agency,
 				Name:      record[0],
 				Surname:   record[1],
 				Document:  document,
@@ -129,45 +143,49 @@ func (c *Client) StartClientLoop() {
 			batchSize++
 
 			if batchSize == c.config.MaxBatch {
+				log.Infof("MANDO UNA TANDA DE APUESTAS %v %v", c.config.MaxBatch, len(records))
+				c.createClientSocket()
+				protocol := NewProtocol(c.conn)
+
 				batchSize = 0
 				_, err = protocol.sendBets(batchBets)
 				
 				if err != nil {
 					log.Errorf("action: send_bets | result: fail | client_id: %v | error: %v",
-						c.config.ID,
-						err,
-					)
-					return
-				}
+					c.config.ID,
+					err,
+				)
+				return
+			}
 				response, err := protocol.receiveMessage()
 				if err != nil {
 					log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
-						c.config.ID,
-						err,
-					)
-					return
-				}
-		
-				if response == OK {
-					log.Infof("action: apuestas_enviadas | result: success | dni: %v | cantidad: %v",
-						document,
-						c.config.MaxBatch,
-					)
-				} else {
-					log.Errorf("action: apuestas_enviadas | result: fail | client_id: %v | cantidad: %v",
-						c.config.ID,
-						c.config.MaxBatch,
-					)
-				}
+					c.config.ID,
+					err,
+				)
+				return
 			}
+			
+			if response == OK {
+				log.Infof("action: apuestas_enviadas | result: success | dni: %v | cantidad: %v",
+				document,
+				c.config.MaxBatch,
+			)
+			} else {
+				log.Errorf("action: apuestas_enviadas | result: fail | client_id: %v | cantidad: %v",
+				c.config.ID,
+				c.config.MaxBatch,
+			)
 		}
-		time.Sleep(c.config.LoopPeriod)
-		
-	}
-	c.conn.Close()
-	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
+		c.conn.Close()
 
+	}
+	}
+	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
+		
 }
+
+
 
 
 

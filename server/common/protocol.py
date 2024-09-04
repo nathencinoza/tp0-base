@@ -30,8 +30,7 @@ class Protocol:
             if code != BET_MESSAGE:
                 raise Exception("Invalid code")
 
-            agency_name_size = int.from_bytes(self.receive_exact(SIZE), byteorder='big')
-            agency = self.receive_exact(agency_name_size).decode()
+            agency = int.from_bytes(self.receive_exact(SIZE), byteorder='big')
             
             name_size = int.from_bytes(self.receive_exact(SIZE), byteorder='big')
             name = self.receive_exact(name_size).decode()
@@ -45,7 +44,7 @@ class Protocol:
             
             bet = Bet(agency, name, surname, document, birthdate, number)
             bets.append(bet)
-        return bets
+        return bets_size, bets
     
 
     def send_success(self):

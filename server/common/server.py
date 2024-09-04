@@ -56,8 +56,7 @@ class Server:
                 self._clients.remove(client_sock)
 
     def __handle_bets(self, bets, size, protocol):
-        for bet in bets:
-            store_bets(bet)
+        store_bets(bets)
         if len(bets) != size:
             logging.error(f"action: apuesta_recibida | result: fail | cantidad: {size}")
             protocol.send_error()
