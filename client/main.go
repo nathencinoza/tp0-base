@@ -127,9 +127,7 @@ func main() {
 
 	select {
 	case <-sigChan:
-		log.Info("action: shutdown | result: received SIGTERM")
 		client.Stop()
 	case <-done:
-		log.Info("action: client | result: completed normally")
 	}
 }

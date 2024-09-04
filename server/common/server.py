@@ -62,7 +62,6 @@ class Server:
         logging.info(f"action: apuesta_almacenada | result: success | dni: {document} | numero: {number}")
     
     def __handle_sigterm(self, signum, frame):
-        logging.info(f"action: shutdown | result: received signal {signum}")
         self._is_active = False
         for client in self._clients:
             logging.info(f"action: shutdown | result: closing client connection {client}")
