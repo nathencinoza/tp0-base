@@ -3,6 +3,9 @@ import logging
 import signal
 from common.protocol import Protocol
 from common.utils import Bet, store_bets, load_bets, has_won
+import threading
+from threading import Lock
+
 BET_MESSAGE = 1
 FINISH_MESSAGE = 4
 class Server:
@@ -14,9 +17,12 @@ class Server:
         self._server_socket.bind(('', port))
         self._server_socket.listen(listen_backlog)
         self._clients = []
+        self.clients_threads = []
         self._is_active = True  
         self.ammount_clients_done = 0
         self.total_clients = ammount_clients
+        self.lock = Lock()  
+
 
     def run(self):
         """
@@ -34,7 +40,8 @@ class Server:
         while self._is_active:
             try:
                 client_sock = self.__accept_new_connection()
-                self.__handle_client_connection(client_sock)
+                client_thread = threading.Thread(target=self.__handle_client_connection, args=(client_sock,))
+                client_thread.start()
             except OSError as e:
                 if not self._is_active:
                     break
@@ -72,7 +79,8 @@ class Server:
     def __handle_draw(self):
         try: 
             logging.info("action: sorteo | result: success")
-            bets = load_bets()
+            with self.lock:
+                bets = load_bets()
             winners = [bet for bet in bets if has_won(bet)]
             for client in self._clients:
                 protocol = Protocol(client)
@@ -85,7 +93,8 @@ class Server:
 
 
     def __handle_bets(self, bets, size, protocol):
-        store_bets(bets)
+        with self.lock:
+            store_bets(bets)
         if len(bets) != size:
             logging.error(f"action: apuesta_recibida | result: fail | cantidad: {size}")
             protocol.send_error()
@@ -97,7 +106,6 @@ class Server:
         logging.info(f"action: shutdown | result: received signal {signum}")
         self._is_active = False
         for client in self._clients:
-            logging.info(f"action: shutdown | result: closing client connection {client}")
             client.close()
         self._clients.clear()
         if self._server_socket:
