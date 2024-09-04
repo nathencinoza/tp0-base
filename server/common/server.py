@@ -58,8 +58,8 @@ class Server:
     def __handle_bet(self, name, surname, document, birthdate, number, protocol):
         bet = Bet('1', name, surname, document, birthdate, number)
         store_bets([bet])
-        protocol.send_success()
         logging.info(f"action: apuesta_almacenada | result: success | dni: {document} | numero: {number}")
+        protocol.send_success()
     
     def __handle_sigterm(self, signum, frame):
         self._is_active = False

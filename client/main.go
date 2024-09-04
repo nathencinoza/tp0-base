@@ -129,5 +129,7 @@ func main() {
 	case <-sigChan:
 		client.Stop()
 	case <-done:
+		client.Stop()
 	}
+
 }
