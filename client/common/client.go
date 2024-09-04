@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"net"
-	"sync"
 	"time"
 
 	"github.com/op/go-logging"
@@ -31,7 +30,6 @@ type Client struct {
 func NewClient(config ClientConfig) *Client {
 	client := &Client{
 		config: config,
-		stopCh: make(chan struct{}),
 	}
 	return client
 }
