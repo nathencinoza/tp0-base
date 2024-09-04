@@ -24,7 +24,6 @@ def generate_compose(output_file, clients):
                 'entrypoint': 'python3 /main.py',
                 'environment': [
                     'PYTHONUNBUFFERED=1',
-                    'LOGGING_LEVEL=DEBUG'
                 ],
                 'volumes': [
                     './server/config.ini:/config.ini'
@@ -48,7 +47,6 @@ def generate_compose(output_file, clients):
             'entrypoint': '/client',
             'environment': [
                 'PYTHONUNBUFFERED=1',
-                'LOGGING_LEVEL=DEBUG',
                 'CLI_ID={}'.format(i),
                 'FILE_PATH=/agency-{}.csv'.format(i),
             ],
