@@ -102,7 +102,6 @@ class Server:
             logging.error(f"action: apuesta_recibida | result: fail | cantidad: {size}")
             protocol.send_error()
             return
-        store_bets(bets)
         logging.info(f"action: apuesta_recibida | result: success | cantidad: {size}")
         protocol.send_success()
     
