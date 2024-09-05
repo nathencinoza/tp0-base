@@ -2,7 +2,6 @@ package common
 
 import (
 	"net"
-	"sync" // ver si tengo que usarlo
 	"time"
 	"strconv"
 	"os"
@@ -28,8 +27,6 @@ type ClientConfig struct {
 type Client struct {
 	config ClientConfig
 	conn   net.Conn
-	stopCh chan struct{}  
-	wg     sync.WaitGroup
 }
 
 // NewClient Initializes a new client receiving the configuration
@@ -37,7 +34,6 @@ type Client struct {
 func NewClient(config ClientConfig) *Client {
 	client := &Client{
 		config: config,
-		stopCh: make(chan struct{}),
 	}
 	return client
 }
@@ -61,7 +57,9 @@ func (c *Client) createClientSocket() error {
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
 
-	
+		c.createClientSocket()
+		protocol := NewProtocol(c.conn)
+
 		file_path := os.Getenv("FILE_PATH")
 		log.Infof("action: open_file | result: success | client_id: %v | file_path: %v",
 			c.config.ID,
@@ -142,9 +140,6 @@ func (c *Client) StartClientLoop() {
 			batchSize++
 
 			if batchSize == c.config.MaxBatch {
-				c.createClientSocket()
-				protocol := NewProtocol(c.conn)
-
 				batchSize = 0
 				_, err = protocol.sendBets(batchBets)
 				
@@ -174,34 +169,45 @@ func (c *Client) StartClientLoop() {
 				c.config.ID,
 				c.config.MaxBatch,
 			)
-			}	
-		c.conn.Close()
+		}
+		
+	}
+
+}	
+log.Infof("BATCH SIZE: %v", batchSize)
+	if batchSize > 0 {
+		_, err = protocol.sendBets(batchBets)
+		if err != nil {
+			log.Errorf("action: send_bets | result: fail | client_id: %v | error: %v",
+				c.config.ID,
+				err,
+			)
+			return
+		}
+		response, err := protocol.receiveMessage()
+		if err != nil {
+			log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
+				c.config.ID,
+				err,
+			)
+			return
+		}
+		if response == OK {
+			log.Infof("action: apuestas_enviadas | result: success | client_id: %v| cantidad: %v",
+			c.config.ID,
+			c.config.MaxBatch,
+		)
+		} else {
+			log.Errorf("action: apuestas_enviadas | result: fail | client_id: %v | cantidad: %v",
+			c.config.ID,
+			c.config.MaxBatch,
+		)
 		}
 	}
-	
-			c.createClientSocket()
-			protocol := NewProtocol(c.conn)
-			_, err = protocol.sendFinish()
-			if err != nil {
-				log.Errorf("action: send_finish | result: fail | client_id: %v | error: %v",
-					c.config.ID,
-					err,
-				)
-				return
-			} 
-			response, err := protocol.receiveWinners()
-			if err != nil {
-				log.Errorf("action: receive_winners | result: fail | client_id: %v | error: %v",
-					c.config.ID,
-					err,
-				)
-				return
-			}
-			log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v",
-				response,
-			)
+	protocol.sendFinish()
+	c.conn.Close()
 	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
-		
+	
 }
 
 
@@ -211,12 +217,8 @@ func (c *Client) StartClientLoop() {
 // Stop Gracefully stops the client by closing the stop channel and waiting for
 // the loop to finish its current iteration.
 func (c *Client) Stop() {
-	close(c.stopCh)
-	c.wg.Wait()
-
 	if c.conn != nil {
 		c.conn.Close()
-		log.Infof("action: close_connection | result: success | client_id: %v", c.config.ID)
 	}
 	log.Infof("action: stop_client | result: success | client_id: %v", c.config.ID)
 }

@@ -51,16 +51,17 @@ class Server:
         """
         try:
             protocol = Protocol(client_sock)
-            code = protocol.receive_code()
-            if code == BET_MESSAGE:
-                size, bets  = protocol.receive_bets()
-                self.__handle_bets(bets, size, protocol)
-            elif code == FINISH_MESSAGE:
-                self.ammount_clients_done += 1
-                if self.ammount_clients_done == self.total_clients:
-                    self.__handle_draw() 
+            while protocol.is_closed() == False:
+                code = protocol.receive_code()
+                if code == "FINISH":
+                    logging.info("action: server | result: closing connection")
+                    break
+                bets_size, bets = protocol.receive_bets()
+                self.__handle_bets(bets, bets_size, protocol)
         except OSError as e:
-            logging.error("action: receive_message | result: fail | error: {e}", e) 
+            logging.error("action: receive_message | result: fail | error: {e}", e)
+        except Exception as e:
+            logging.error("action: receive_message | result: fail | error: %s", str(e))
         finally:
             if (code != FINISH_MESSAGE):
                 client_sock.close()
@@ -94,10 +95,8 @@ class Server:
         protocol.send_success()
     
     def __handle_sigterm(self, signum, frame):
-        logging.info(f"action: shutdown | result: received signal {signum}")
         self._is_active = False
         for client in self._clients:
-            logging.info(f"action: shutdown | result: closing client connection {client}")
             client.close()
         self._clients.clear()
         if self._server_socket:
