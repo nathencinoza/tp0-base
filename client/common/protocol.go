@@ -19,6 +19,7 @@ const (
     BET int = 1
     OK  int = 2
 	ERROR int = 3
+	END_OF_BETS int = 4
 )
 type Protocol struct {
 	conn net.Conn
@@ -68,74 +69,74 @@ func writeFully(conn net.Conn, buf []byte) error {
 
 // SerializeBet serializes a Bet structure into a byte slice and sends it
 func (p *Protocol) sendBets(bets []Bet) (string, error) {
-	betsAmount := htonl(len(bets))
-	_, err := p.conn.Write(betsAmount)
+	betBytes := htonl(int(BET))
+	err := writeFully(p.conn, betBytes)
 	if err != nil {
-		return "Failed to send bets amount", err
+		return "Failed to send bet message", err
 	}
 
+	betsAmount := htonl(len(bets))
+	err = writeFully(p.conn, betsAmount)
+	if err != nil {
+		return "Failed to send bet amount", err
+	}
 	for _, bet := range bets {
-		// Serialize the bet type
-		betBytes := htonl(int(BET))
-		_, err := p.conn.Write(betBytes)
-		if err != nil {
-			return "Failed to send bet type", err
-		}
 
 		// Serialize the agency	
 		agencyBytes := htonl(bet.Agency)
-		_, err = p.conn.Write(agencyBytes)
+		err = writeFully(p.conn, agencyBytes)
 		if err != nil {
 			return "Failed to send agency", err
 		}
 
-	// Serialize the name
-	nameBytes := []byte(bet.Name)
-	nameSizeBytes := htonl(len(nameBytes))
-	err = writeFully(p.conn, nameSizeBytes)
-	if err != nil {
-		return "Failed to send name size", err
-	}
-	err = writeFully(p.conn, nameBytes)
-	if err != nil {
-		return "Failed to send name", err
+		// Serialize the name
+		nameBytes := []byte(bet.Name)
+		nameSizeBytes := htonl(len(nameBytes))
+		err = writeFully(p.conn, nameSizeBytes)
+		if err != nil {
+			return "Failed to send name size", err
+		}
+		err = writeFully(p.conn, nameBytes)
+		if err != nil {
+			return "Failed to send name", err
+		}
+
+		// Serialize the surname
+		surnameBytes := []byte(bet.Surname)
+		surnameSizeBytes := htonl(len(surnameBytes))
+		err = writeFully(p.conn, surnameSizeBytes)
+		if err != nil {
+			return "Failed to send surname size", err
+		}
+		err = writeFully(p.conn, surnameBytes)
+		if err != nil {
+			return "Failed to send surname", err
+		}
+
+
+		// Serialize the document
+		documentBytes := htonl(int(bet.Document))
+		err = writeFully(p.conn, documentBytes)
+		if err != nil {
+			return "Failed to send document", err
+		}
+
+		// Serialize the birthdate
+		birthdateBytes := []byte(bet.Birthdate)
+		err = writeFully(p.conn, birthdateBytes)
+		if err != nil {
+			return "Failed to send birthdate", err
+		}
+
+		// Serialize the number
+		numberBytes := htonl(int(bet.Number))
+		err = writeFully(p.conn, numberBytes)
+		if err != nil {
+			return "Failed to send number", err
 	}
 
-	// Serialize the surname
-	surnameBytes := []byte(bet.Surname)
-	surnameSizeBytes := htonl(len(surnameBytes))
-	err = writeFully(p.conn, surnameSizeBytes)
-	if err != nil {
-		return "Failed to send surname size", err
-	}
-	err = writeFully(p.conn, surnameBytes)
-	if err != nil {
-		return "Failed to send surname", err
-	}
-
-
-	// Serialize the document
-	documentBytes := htonl(int(bet.Document))
-	err = writeFully(p.conn, documentBytes)
-	if err != nil {
-		return "Failed to send document", err
-	}
-
-	// Serialize the birthdate
-	birthdateBytes := []byte(bet.Birthdate)
-	err = writeFully(p.conn, birthdateBytes)
-	if err != nil {
-		return "Failed to send birthdate", err
-	}
-
-	// Serialize the number
-	numberBytes := htonl(int(bet.Number))
-	err = writeFully(p.conn, numberBytes)
-	if err != nil {
-		return "Failed to send number", err
-	}
-
-	return "Bet sent", nil
+}
+return "Bet sent", nil
 }
 
 func (p *Protocol) receiveMessage() (int, error) {
@@ -146,4 +147,13 @@ func (p *Protocol) receiveMessage() (int, error) {
 	}
 	messageType := int(ntohl(messageBytes))
 	return messageType, nil
+}
+
+func (p *Protocol) sendFinish() error {
+	finishBytes := htonl(int(END_OF_BETS))
+	err := writeFully(p.conn, finishBytes)
+	if err != nil {
+		return err
+	}
+	return nil
 }

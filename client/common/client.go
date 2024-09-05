@@ -57,7 +57,9 @@ func (c *Client) createClientSocket() error {
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
 
-	
+		c.createClientSocket()
+		protocol := NewProtocol(c.conn)
+
 		file_path := os.Getenv("FILE_PATH")
 		log.Infof("action: open_file | result: success | client_id: %v | file_path: %v",
 			c.config.ID,
@@ -139,10 +141,6 @@ func (c *Client) StartClientLoop() {
 			batchSize++
 
 			if batchSize == c.config.MaxBatch {
-				log.Infof("MANDO UNA TANDA DE APUESTAS %v %v", c.config.MaxBatch, len(records))
-				c.createClientSocket()
-				protocol := NewProtocol(c.conn)
-
 				batchSize = 0
 				_, err = protocol.sendBets(batchBets)
 				
@@ -173,12 +171,44 @@ func (c *Client) StartClientLoop() {
 				c.config.MaxBatch,
 			)
 		}
-		c.conn.Close()
-
-	}
-	}
-	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
 		
+	}
+
+}	
+log.Infof("BATCH SIZE: %v", batchSize)
+	if batchSize > 0 {
+		_, err = protocol.sendBets(batchBets)
+		if err != nil {
+			log.Errorf("action: send_bets | result: fail | client_id: %v | error: %v",
+				c.config.ID,
+				err,
+			)
+			return
+		}
+		response, err := protocol.receiveMessage()
+		if err != nil {
+			log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
+				c.config.ID,
+				err,
+			)
+			return
+		}
+		if response == OK {
+			log.Infof("action: apuestas_enviadas | result: success | client_id: %v| cantidad: %v",
+			c.config.ID,
+			c.config.MaxBatch,
+		)
+		} else {
+			log.Errorf("action: apuestas_enviadas | result: fail | client_id: %v | cantidad: %v",
+			c.config.ID,
+			c.config.MaxBatch,
+		)
+		}
+	}
+	protocol.sendFinish()
+	c.conn.Close()
+	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
+	
 }
 
 

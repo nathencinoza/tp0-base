@@ -46,10 +46,17 @@ class Server:
         """
         try:
             protocol = Protocol(client_sock)
-            size, bets  = protocol.receive_bets()
-            self.__handle_bets(bets, size, protocol)
+            while protocol.is_closed() == False:
+                code = protocol.receive_code()
+                if code == "FINISH":
+                    logging.info("action: server | result: closing connection")
+                    break
+                bets_size, bets = protocol.receive_bets()
+                self.__handle_bets(bets, bets_size, protocol)
         except OSError as e:
-            logging.error("action: receive_message | result: fail | error: {e}")
+            logging.error("action: receive_message | result: fail | error: {e}", e)
+        except Exception as e:
+            logging.error("action: receive_message | result: fail | error: %s", str(e))
         finally:
             client_sock.close()
             if client_sock in self._clients:
@@ -67,7 +74,6 @@ class Server:
     def __handle_sigterm(self, signum, frame):
         self._is_active = False
         for client in self._clients:
-            logging.info(f"action: shutdown | result: closing client connection {client}")
             client.close()
         self._clients.clear()
         if self._server_socket:
