@@ -3,8 +3,7 @@ import logging
 import signal
 from common.protocol import Protocol
 from common.utils import Bet, store_bets, load_bets, has_won
-BET_MESSAGE = 1
-FINISH_MESSAGE = 4
+
 class Server:
     def __init__(self, port, listen_backlog, ammount_clients):
         """
@@ -53,21 +52,19 @@ class Server:
             protocol = Protocol(client_sock)
             while protocol.is_closed() == False:
                 code = protocol.receive_code()
-                if code == "FINISH":
-                    logging.info("action: server | result: closing connection")
+                if code == "BET":
+                    bets_size, bets = protocol.receive_bets()
+                    self.__handle_bets(bets, bets_size, protocol)
+                elif code == "FINISH":
+                    self.ammount_clients_done += 1
+                    if self.ammount_clients_done == self.total_clients:
+                        self.__handle_draw()
                     break
-                bets_size, bets = protocol.receive_bets()
-                self.__handle_bets(bets, bets_size, protocol)
         except OSError as e:
             logging.error("action: receive_message | result: fail | error: {e}", e)
         except Exception as e:
             logging.error("action: receive_message | result: fail | error: %s", str(e))
-        finally:
-            if (code != FINISH_MESSAGE):
-                client_sock.close()
-                for client in self._clients:
-                    if client == client_sock:
-                        self._clients.remove(client)
+
 
 
     def __handle_draw(self):
@@ -76,6 +73,7 @@ class Server:
             bets = load_bets()
             winners = [bet for bet in bets if has_won(bet)]
             for client in self._clients:
+                logging.info(f"action: enviar_ganadores | result: in_progress | ip: {client.getpeername()[0]}")
                 protocol = Protocol(client)
                 protocol.send_winners(winners)
         finally: 
@@ -86,11 +84,11 @@ class Server:
 
 
     def __handle_bets(self, bets, size, protocol):
-        store_bets(bets)
         if len(bets) != size:
             logging.error(f"action: apuesta_recibida | result: fail | cantidad: {size}")
             protocol.send_error()
             return
+        store_bets(bets)
         logging.info(f"action: apuesta_recibida | result: success | cantidad: {size}")
         protocol.send_success()
     

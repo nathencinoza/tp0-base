@@ -45,7 +45,6 @@ class Protocol:
         bets = []
         bets_size = int.from_bytes(self.receive_exact(SIZE), byteorder='big')
         for _ in range(bets_size):
-
             agency = int.from_bytes(self.receive_exact(SIZE), byteorder='big')
             
             name_size = int.from_bytes(self.receive_exact(SIZE), byteorder='big')

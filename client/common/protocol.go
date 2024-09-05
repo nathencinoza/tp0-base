@@ -20,8 +20,8 @@ const (
     OK  int = 2
 	ERROR int = 3
 	FINISH int = 4
-	END_OF_BETS int = 4
 )
+
 type Protocol struct {
 	conn net.Conn
 }
@@ -75,7 +75,6 @@ func (p *Protocol) sendBets(bets []Bet) (string, error) {
 	if err != nil {
 		return "Failed to send bet message", err
 	}
-
 	betsAmount := htonl(len(bets))
 	err = writeFully(p.conn, betsAmount)
 	if err != nil {
@@ -151,22 +150,13 @@ func (p *Protocol) receiveMessage() (int, error) {
 }
 
 
-func (p *Protocol) sendFinish() (string, error) {
-	finishBytes := htonl(int(FINISH))
-	_, err := p.conn.Write(finishBytes)
-	if err != nil {
-		return "Failed to send finish", err
-	}
-	return "success", nil
-}
-
 
 func (p *Protocol) receiveWinners() (int, error) {
     amountOfWinnersBytes := make([]byte, 4)
-    _, err := p.conn.Read(amountOfWinnersBytes)
-    if err != nil {
-        return 0, err
-    }
+    _, err := readFully(p.conn, amountOfWinnersBytes)
+	if err != nil {
+		return 0, err
+	}
     amountOfWinners := int(ntohl(amountOfWinnersBytes))
 
 	for i := 0; i < amountOfWinners; i++ {
@@ -186,7 +176,7 @@ func (p *Protocol) receiveWinners() (int, error) {
 	return amountOfWinners, nil
 }
 func (p *Protocol) sendFinish() error {
-	finishBytes := htonl(int(END_OF_BETS))
+	finishBytes := htonl(int(FINISH))
 	err := writeFully(p.conn, finishBytes)
 	if err != nil {
 		return err
