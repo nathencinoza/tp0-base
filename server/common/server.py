@@ -67,10 +67,11 @@ class Server:
                     bets_size, bets = protocol.receive_bets()
                     self.__handle_bets(bets, bets_size, protocol)
                 elif code == "FINISH":
-                    self.ammount_clients_done += 1
-                    if self.ammount_clients_done == self.total_clients:
-                        self.__handle_draw()
-                    break
+                    with self.lock:
+                        self.ammount_clients_done += 1
+                        if self.ammount_clients_done == self.total_clients:
+                            self.__handle_draw()
+                        break
         except OSError as e:
             logging.error("action: receive_message | result: fail | error: {e}", e)
         except Exception as e:
@@ -81,8 +82,7 @@ class Server:
     def __handle_draw(self):
         try: 
             logging.info("action: sorteo | result: success")
-            with self.lock:
-                bets = load_bets()
+            bets = load_bets()
             winners = [bet for bet in bets if has_won(bet)]
             for client in self._clients:
                 logging.info(f"action: enviar_ganadores | result: in_progress | ip: {client.getpeername()[0]}")
