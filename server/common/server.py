@@ -42,12 +42,15 @@ class Server:
                 client_sock = self.__accept_new_connection()
                 client_thread = threading.Thread(target=self.__handle_client_connection, args=(client_sock,))
                 client_thread.start()
+                self.clients_threads.append(client_thread)
             except OSError as e:
                 if not self._is_active:
                     break
                 logging.error(f"action: server | result: fail | error: {e}")
                 break
-
+        for thread in self.clients_threads:
+            thread.join()
+            
             
     def __handle_client_connection(self, client_sock):
         """
@@ -58,22 +61,21 @@ class Server:
         """
         try:
             protocol = Protocol(client_sock)
-            code = protocol.receive_code()
-            if code == BET_MESSAGE:
-                size, bets  = protocol.receive_bets()
-                self.__handle_bets(bets, size, protocol)
-            elif code == FINISH_MESSAGE:
-                self.ammount_clients_done += 1
-                if self.ammount_clients_done == self.total_clients:
-                    self.__handle_draw() 
+            while protocol.is_closed() == False:
+                code = protocol.receive_code()
+                if code == "BET":
+                    bets_size, bets = protocol.receive_bets()
+                    self.__handle_bets(bets, bets_size, protocol)
+                elif code == "FINISH":
+                    self.ammount_clients_done += 1
+                    if self.ammount_clients_done == self.total_clients:
+                        self.__handle_draw()
+                    break
         except OSError as e:
-            logging.error("action: receive_message | result: fail | error: {e}", e) 
-        finally:
-            if (code != FINISH_MESSAGE):
-                client_sock.close()
-                for client in self._clients:
-                    if client == client_sock:
-                        self._clients.remove(client)
+            logging.error("action: receive_message | result: fail | error: {e}", e)
+        except Exception as e:
+            logging.error("action: receive_message | result: fail | error: %s", str(e))
+
 
 
     def __handle_draw(self):
@@ -83,6 +85,7 @@ class Server:
                 bets = load_bets()
             winners = [bet for bet in bets if has_won(bet)]
             for client in self._clients:
+                logging.info(f"action: enviar_ganadores | result: in_progress | ip: {client.getpeername()[0]}")
                 protocol = Protocol(client)
                 protocol.send_winners(winners)
         finally: 
@@ -99,11 +102,11 @@ class Server:
             logging.error(f"action: apuesta_recibida | result: fail | cantidad: {size}")
             protocol.send_error()
             return
+        store_bets(bets)
         logging.info(f"action: apuesta_recibida | result: success | cantidad: {size}")
         protocol.send_success()
     
     def __handle_sigterm(self, signum, frame):
-        logging.info(f"action: shutdown | result: received signal {signum}")
         self._is_active = False
         for client in self._clients:
             client.close()

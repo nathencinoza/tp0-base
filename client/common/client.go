@@ -2,13 +2,13 @@ package common
 
 import (
 	"net"
-	"sync" // ver si tengo que usarlo
 	"time"
 	"strconv"
 	"os"
 	"encoding/csv"
     "path/filepath"
     "strings"
+	"fmt"
 
 	"github.com/op/go-logging"
 )
@@ -28,8 +28,6 @@ type ClientConfig struct {
 type Client struct {
 	config ClientConfig
 	conn   net.Conn
-	stopCh chan struct{}  
-	wg     sync.WaitGroup
 }
 
 // NewClient Initializes a new client receiving the configuration
@@ -37,7 +35,6 @@ type Client struct {
 func NewClient(config ClientConfig) *Client {
 	client := &Client{
 		config: config,
-		stopCh: make(chan struct{}),
 	}
 	return client
 }
@@ -57,166 +54,159 @@ func (c *Client) createClientSocket() error {
 	c.conn = conn
 	return nil
 }
-
-// StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
+    c.createClientSocket()
+    defer c.conn.Close()
+    protocol := NewProtocol(c.conn)
 
-	
-		file_path := os.Getenv("FILE_PATH")
-		log.Infof("action: open_file | result: success | client_id: %v | file_path: %v",
+    filePath := os.Getenv("FILE_PATH")
+    file, err := os.Open(filePath)
+    if err != nil {
+		log.Errorf("action: open_file | result: fail | client_id: %v | error: %v",
 			c.config.ID,
-			file_path,
+			err,
 		)
-		file, err := os.Open(file_path)
-		if err != nil {
-			log.Errorf("action: open_file | result: fail | client_id: %v | error: %v",
+        return
+    }
+    defer file.Close()
+
+    records, err := c.readCSV(file)
+    if err != nil {
+		log.Errorf("action: read_csv | result: fail | client_id: %v | error: %v",
+			c.config.ID,
+			err,
+		)
+        return
+    }
+
+    batchBets := make([]Bet, 0, c.config.MaxBatch)
+    for _, record := range records {
+        bet, err := c.parseRecord(record, filePath)
+        if err != nil {
+			log.Errorf("action: parse_record | result: skip | client_id: %v | record: %v",
 				c.config.ID,
-				err,
+				record,
 			)
-			return
-		}
-		defer file.Close()
+            continue
+        }
+        batchBets = append(batchBets, bet)
 
-		reader := csv.NewReader(file)
-		records, err := reader.ReadAll()
-		if err != nil {
-			log.Errorf("action: read_csv | result: fail | client_id: %v | error: %v",
-				c.config.ID,
-				err,
-			)
-			return
-		}
+        if len(batchBets) == c.config.MaxBatch {
+            if err := c.sendBatch(protocol, batchBets); err != nil {
+                return
+            }
+            batchBets = batchBets[:0]
+        }
+    }
 
-		batchSize := 0
-		batchBets := make([]Bet, 0, c.config.MaxBatch)
-		for _, record := range records {
-			if len(record) != 5 {
-				log.Errorf("action: parse_record | result: skip | client_id: %v | record: %v",
-					c.config.ID,
-					record,
-				)
-				return
-			}
+    if len(batchBets) > 0 {
+        if err := c.sendBatch(protocol, batchBets); err != nil {
+            return
+        }
+    }
 
-			document, err := strconv.Atoi(record[2])
-			if err != nil {
-				log.Errorf("action: parse_document | result: skip | client_id: %v | error: %v",
-					c.config.ID,
-					err,
-				)
-				return
-			}
-
-			number, err := strconv.Atoi(record[4])
-			if err != nil {
-				log.Errorf("action: parse_number | result: skip | client_id: %v | error: %v",
-					c.config.ID,
-					err,
-				)
-				return
-			}
-
-			fileName := filepath.Base(file_path)
-			agencyStr := strings.TrimPrefix(fileName, "agency-")
-			agencyStr = strings.TrimSuffix(agencyStr, ".csv")
-			
-			agency, err := strconv.Atoi(agencyStr)
-			if err != nil {
-				log.Errorf("action: parse_agency | result: skip | client_id: %v | error: %v",
-					c.config.ID,
-					err,
-				)
-				return
-			}
-					
-		
-			bet := Bet{
-				Agency:    agency,
-				Name:      record[0],
-				Surname:   record[1],
-				Document:  document,
-				Birthdate: record[3],
-				Number:    number,
-			}
-			batchBets = append(batchBets, bet)
-			batchSize++
-
-			if batchSize == c.config.MaxBatch {
-				c.createClientSocket()
-				protocol := NewProtocol(c.conn)
-
-				batchSize = 0
-				_, err = protocol.sendBets(batchBets)
-				
-				if err != nil {
-					log.Errorf("action: send_bets | result: fail | client_id: %v | error: %v",
-					c.config.ID,
-					err,
-				)
-				return
-			}
-				response, err := protocol.receiveMessage()
-				if err != nil {
-					log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
-					c.config.ID,
-					err,
-				)
-				return
-			}
-			
-			if response == OK {
-				log.Infof("action: apuestas_enviadas | result: success | dni: %v | cantidad: %v",
-				document,
-				c.config.MaxBatch,
-			)
-			} else {
-				log.Errorf("action: apuestas_enviadas | result: fail | client_id: %v | cantidad: %v",
-				c.config.ID,
-				c.config.MaxBatch,
-			)
-			}	
-		c.conn.Close()
-		}
-	}
-	
-			c.createClientSocket()
-			protocol := NewProtocol(c.conn)
-			_, err = protocol.sendFinish()
-			if err != nil {
-				log.Errorf("action: send_finish | result: fail | client_id: %v | error: %v",
-					c.config.ID,
-					err,
-				)
-				return
-			} 
-			response, err := protocol.receiveWinners()
-			if err != nil {
-				log.Errorf("action: receive_winners | result: fail | client_id: %v | error: %v",
-					c.config.ID,
-					err,
-				)
-				return
-			}
-			log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v",
-				response,
-			)
+    protocol.sendFinish()
+    c.handleWinners(protocol)
 	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
-		
 }
 
+func (c *Client) readCSV(file *os.File) ([][]string, error) {
+	reader := csv.NewReader(file)
+	records, err := reader.ReadAll()
+	if err != nil {
+		return nil, err
+	}
+	return records, nil
+}
 
+func (c *Client) parseRecord(record []string, filePath string) (Bet, error) {
+    if len(record) != 5 {
+        return Bet{}, fmt.Errorf("invalid record")
+    }
 
+    document, err := strconv.Atoi(record[2])
+    if err != nil {
+        return Bet{}, fmt.Errorf("invalid document")
+    }
 
+    number, err := strconv.Atoi(record[4])
+    if err != nil {
+        return Bet{}, fmt.Errorf("invalid number")
+    }
+
+    agency, err := c.getAgencyFromFileName(filePath)
+    if err != nil {
+        return Bet{}, fmt.Errorf("invalid agency")
+    }
+
+    return Bet{
+        Agency:    agency,
+        Name:      record[0],
+        Surname:   record[1],
+        Document:  document,
+        Birthdate: record[3],
+        Number:    number,
+    }, nil
+}
+func (c *Client) getAgencyFromFileName(filePath string) (int, error) {
+    fileName := filepath.Base(filePath)
+    agencyStr := strings.TrimPrefix(fileName, "agency-")
+    agencyStr = strings.TrimSuffix(agencyStr, ".csv")
+    return strconv.Atoi(agencyStr)
+}
+
+func (c *Client) sendBatch(protocol *Protocol, bets []Bet) error {
+    _, err := protocol.sendBets(bets)
+    if err != nil {
+		log.Errorf("action: send_bets | result: fail | client_id: %v | error: %v",
+			c.config.ID,
+			err,
+		)
+		return err
+	}
+
+    response, err := protocol.receiveMessage()
+    if err != nil {
+		log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
+			c.config.ID,
+			err,
+		)
+		return err
+	}
+	if response == OK {
+		log.Infof("action: apuestas_enviadas | result: success | client_id: %v| cantidad: %v",
+		c.config.ID,
+		len(bets),
+	)
+	} else {
+		log.Errorf("action: apuestas_enviadas | result: fail | client_id: %v | cantidad: %v",
+		c.config.ID,
+		len(bets),
+	)
+	}
+    return nil
+}
+
+func (c *Client) handleWinners(protocol *Protocol) {
+	winners, err := protocol.receiveWinners()
+    if err != nil {
+        log.Errorf("action: consulta_ganadores | result: fail | client_id: %v | error: %v",
+			c.config.ID,
+			err,
+		)
+        return
+    }
+	log.Infof("action: consulta_ganadores | result: success | client_id: %v | winners: %v",
+		c.config.ID,
+		winners,
+	)
+}
 
 // Stop Gracefully stops the client by closing the stop channel and waiting for
 // the loop to finish its current iteration.
 func (c *Client) Stop() {
-	close(c.stopCh)
-	c.wg.Wait()
-
 	if c.conn != nil {
 		c.conn.Close()
-		log.Infof("action: close_connection | result: success | client_id: %v", c.config.ID)
 	}
 	log.Infof("action: stop_client | result: success | client_id: %v", c.config.ID)
 }
