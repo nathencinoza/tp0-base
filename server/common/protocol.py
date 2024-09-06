@@ -41,12 +41,10 @@ class Protocol:
         else:
             return "BET"
 
-    def receive_bets(self):
+    def receive_bets(self, agency):
         bets = []
         bets_size = int.from_bytes(self.receive_exact(SIZE), byteorder='big')
         for _ in range(bets_size):
-            agency = int.from_bytes(self.receive_exact(SIZE), byteorder='big')
-            
             name_size = int.from_bytes(self.receive_exact(SIZE), byteorder='big')
             name = self.receive_exact(name_size).decode()
             
@@ -74,3 +72,6 @@ class Protocol:
             document_size = len(winner.document)
             self.socket.sendall(document_size.to_bytes(SIZE, byteorder='big'))
             self.socket.sendall(winner.document.encode())
+
+    def receive_agency(self):
+        return int.from_bytes(self.receive_exact(SIZE), byteorder='big')

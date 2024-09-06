@@ -9,7 +9,7 @@ import (
     "path/filepath"
     "strings"
 	"fmt"
-
+	"io"
 	"github.com/op/go-logging"
 )
 
@@ -70,38 +70,51 @@ func (c *Client) StartClientLoop() {
     }
     defer file.Close()
 
-    records, err := c.readCSV(file)
-    if err != nil {
-		log.Errorf("action: read_csv | result: fail | client_id: %v | error: %v",
+	if err := c.sendAgency(protocol); err != nil {
+		log.Errorf("action: send_agency | result: fail | client_id: %v | error: %v",
 			c.config.ID,
 			err,
 		)
-        return
-    }
+		return
+	}
 
-    batchBets := make([]Bet, 0, c.config.MaxBatch)
-    for _, record := range records {
-        bet, err := c.parseRecord(record, filePath)
-        if err != nil {
-			log.Errorf("action: parse_record | result: skip | client_id: %v | record: %v",
-				c.config.ID,
-				record,
-			)
-            continue
+    reader := csv.NewReader(file)
+
+	
+
+    for {
+        records, err := c.readBatchCSV(reader, c.config.MaxBatch) 
+        if err == io.EOF && len(records) == 0 {
+            break
         }
-        batchBets = append(batchBets, bet)
+        if err != nil && err != io.EOF {
+			log.Errorf("action: read_batch_csv | result: fail | client_id: %v | error: %v",
+				c.config.ID,
+				err,
+			)
+            return
+        }
 
-        if len(batchBets) == c.config.MaxBatch {
+        batchBets := make([]Bet, 0, c.config.MaxBatch)
+        for _, record := range records {
+            bet, err := c.parseRecord(record)
+            if err != nil {
+				log.Errorf("action: parse_record | result: skip | client_id: %v | record: %v",
+					c.config.ID,
+					record,
+				)
+                continue
+            }
+            batchBets = append(batchBets, bet)
+        }
+
+        if len(batchBets) > 0 {
             if err := c.sendBatch(protocol, batchBets); err != nil {
                 return
             }
-            batchBets = batchBets[:0]
         }
-    }
-
-    if len(batchBets) > 0 {
-        if err := c.sendBatch(protocol, batchBets); err != nil {
-            return
+        if err == io.EOF {
+            break
         }
     }
 
@@ -110,16 +123,22 @@ func (c *Client) StartClientLoop() {
 	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
 }
 
-func (c *Client) readCSV(file *os.File) ([][]string, error) {
-	reader := csv.NewReader(file)
-	records, err := reader.ReadAll()
-	if err != nil {
-		return nil, err
+func (c *Client) readBatchCSV(reader *csv.Reader, batchSize int) ([][]string, error) {
+	var records [][]string
+	for i := 0; i < batchSize; i++ {
+		record, err := reader.Read()
+		if err == io.EOF {
+			return records, io.EOF
+		}
+		if err != nil {
+			return nil, err
+		}
+		records = append(records, record)
 	}
 	return records, nil
 }
 
-func (c *Client) parseRecord(record []string, filePath string) (Bet, error) {
+func (c *Client) parseRecord(record []string) (Bet, error) {
     if len(record) != 5 {
         return Bet{}, fmt.Errorf("invalid record")
     }
@@ -134,13 +153,7 @@ func (c *Client) parseRecord(record []string, filePath string) (Bet, error) {
         return Bet{}, fmt.Errorf("invalid number")
     }
 
-    agency, err := c.getAgencyFromFileName(filePath)
-    if err != nil {
-        return Bet{}, fmt.Errorf("invalid agency")
-    }
-
     return Bet{
-        Agency:    agency,
         Name:      record[0],
         Surname:   record[1],
         Document:  document,
@@ -154,7 +167,17 @@ func (c *Client) getAgencyFromFileName(filePath string) (int, error) {
     agencyStr = strings.TrimSuffix(agencyStr, ".csv")
     return strconv.Atoi(agencyStr)
 }
-
+func (c* Client) sendAgency(protocol *Protocol) error {
+	agency, err := c.getAgencyFromFileName(os.Getenv("FILE_PATH"))
+	if err != nil {
+		return err
+	}
+	err = protocol.sendAgency(agency)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 func (c *Client) sendBatch(protocol *Protocol, bets []Bet) error {
     _, err := protocol.sendBets(bets)
     if err != nil {

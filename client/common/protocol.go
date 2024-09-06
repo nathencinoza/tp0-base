@@ -4,10 +4,10 @@ package common
 import (
 	"encoding/binary"
 	"net"
+	"bytes"
 )
 
 type Bet struct {
-	Agency	   int
 	Name       string
 	Surname    string
 	Document   int
@@ -67,14 +67,24 @@ func writeFully(conn net.Conn, buf []byte) error {
     return nil
 }
 
+func (p *Protocol)  sendAgency(agency int) (error) {
+	agencyBytes := htonl(agency)
+	err := writeFully(p.conn, agencyBytes)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
-// SerializeBet serializes a Bet structure into a byte slice and sends it
 func (p *Protocol) sendBets(bets []Bet) (string, error) {
+	var buffer bytes.Buffer
+
 	betBytes := htonl(int(BET))
 	err := writeFully(p.conn, betBytes)
 	if err != nil {
 		return "Failed to send bet message", err
 	}
+
 	betsAmount := htonl(len(bets))
 	err = writeFully(p.conn, betsAmount)
 	if err != nil {
@@ -82,61 +92,28 @@ func (p *Protocol) sendBets(bets []Bet) (string, error) {
 	}
 	for _, bet := range bets {
 
-		// Serialize the agency	
-		agencyBytes := htonl(bet.Agency)
-		err = writeFully(p.conn, agencyBytes)
-		if err != nil {
-			return "Failed to send agency", err
-		}
-
-		// Serialize the name
 		nameBytes := []byte(bet.Name)
-		nameSizeBytes := htonl(len(nameBytes))
-		err = writeFully(p.conn, nameSizeBytes)
-		if err != nil {
-			return "Failed to send name size", err
-		}
-		err = writeFully(p.conn, nameBytes)
-		if err != nil {
-			return "Failed to send name", err
-		}
+		binary.Write(&buffer, binary.BigEndian, int32(len(nameBytes))) 
+		buffer.Write(nameBytes)                                       
 
-		// Serialize the surname
 		surnameBytes := []byte(bet.Surname)
-		surnameSizeBytes := htonl(len(surnameBytes))
-		err = writeFully(p.conn, surnameSizeBytes)
-		if err != nil {
-			return "Failed to send surname size", err
-		}
-		err = writeFully(p.conn, surnameBytes)
-		if err != nil {
-			return "Failed to send surname", err
-		}
+		binary.Write(&buffer, binary.BigEndian, int32(len(surnameBytes))) 
+		buffer.Write(surnameBytes)                                        
 
+		binary.Write(&buffer, binary.BigEndian, int32(bet.Document))
 
-		// Serialize the document
-		documentBytes := htonl(int(bet.Document))
-		err = writeFully(p.conn, documentBytes)
-		if err != nil {
-			return "Failed to send document", err
-		}
-
-		// Serialize the birthdate
 		birthdateBytes := []byte(bet.Birthdate)
-		err = writeFully(p.conn, birthdateBytes)
-		if err != nil {
-			return "Failed to send birthdate", err
-		}
+		buffer.Write(birthdateBytes)
 
-		// Serialize the number
-		numberBytes := htonl(int(bet.Number))
-		err = writeFully(p.conn, numberBytes)
-		if err != nil {
-			return "Failed to send number", err
+		binary.Write(&buffer, binary.BigEndian, int32(bet.Number))
 	}
 
-}
-return "Bet sent", nil
+	err = writeFully(p.conn, buffer.Bytes())
+	if err != nil {
+		return "Failed to send batch", err
+	}
+
+	return "Batch sent", nil
 }
 
 func (p *Protocol) receiveMessage() (int, error) {
